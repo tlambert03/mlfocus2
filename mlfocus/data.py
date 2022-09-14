@@ -83,21 +83,32 @@ class SheetAlign(Dataset):
 
         img = self.arrays[file][focus]
 
+        img = self._random_crop(img, self.patch_size)
+
+        img = img.astype("float32")
+
+        if self.transforms is not None:
+            img = self.transforms(img)
+
+        return img, target
+
+    def _random_crop(self, img: zarr.Array, size, min_intensity=190):
+
         z, h, w = img.shape
-        tz, th, tw = (self.patch_size,) * 3
+        tz, th, tw = (size,) * 3
 
         if z + 1 < tz or h + 1 < th or w + 1 < tw:
             raise ValueError(
                 f"Required crop size {(tz, th, tw)} is larger then input image size {(z, h, w)}"
             )
 
-        deep = torch.randint(0, z - tz + 1, size=(1,)).item()
-        top = torch.randint(0, h - th + 1, size=(1,)).item()
-        left = torch.randint(0, w - tw + 1, size=(1,)).item()
+        deep = int(torch.randint(0, z - tz + 1, size=(1,)).item())
+        top = int(torch.randint(0, h - th + 1, size=(1,)).item())
+        left = int(torch.randint(0, w - tw + 1, size=(1,)).item())
 
-        img = img[deep : deep + tz, top : top + th, left : left + tw].astype("float32")
+        crop = img[deep : deep + tz, top : top + th, left : left + tw]
 
-        if self.transforms is not None:
-            img = self.transforms(img)
+        while crop.max() < min_intensity:
+            crop = self._random_crop(img, size, min_intensity)
 
-        return img, target
+        return crop
