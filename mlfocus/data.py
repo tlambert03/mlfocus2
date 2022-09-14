@@ -8,6 +8,24 @@ import torch
 import re
 
 
+class Normalize:
+    def __init__(self, minq=0.01, maxq=0.99):
+        self.q = torch.Tensor([minq, maxq])
+
+    def __call__(self, x):
+        mi, ma = torch.quantile(x, self.q)
+        return (x - mi) / ((ma - mi) + 1e-8)
+
+
+class RandomNoise:
+    def __init__(self, mean=0, std=0.2):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, x):
+        return x + torch.randn_like(x) * self.std + self.mean
+
+
 class SheetAlign(Dataset):
     """
 
@@ -42,7 +60,9 @@ class SheetAlign(Dataset):
         self.root = Path(root).expanduser()
         self.patch_size = patch_size
         if transforms is None:
-            transforms = tf.Compose([tf.ToTensor(), tf.RandomHorizontalFlip()])
+            transforms = tf.Compose(
+                [tf.ToTensor(), tf.RandomHorizontalFlip(), Normalize(), RandomNoise()]
+            )
         self.transforms = transforms
 
         if download:
